@@ -1,72 +1,98 @@
-import express from "express";
-import bcrypt from "bcrypt";
-import User from "../lib/sequelize.js";
-import 'dotenv/config'
-let verifiedUsers = {};
-const router = express.Router();
+import { useRef, useEffect, useState } from 'react';
+import type { Option } from 'types/constants';
 
-router.post("/signup", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 12);
-    // צריך  להוסיף בדיקה אם  קיים כבר המשתמש
-    const newUser = await User.create({
-      username,
-      password_hash: hashedPassword,
-    });
+interface UseChipsOverflowOptions {
+  items: Option[] | undefined;
+  emptyChipWidth: number;
+  avgCharSize: number;
+  gapWidth: number;
+  overflowChipWidth: number;
+  removedChipWidth?: number;
+  lines?: number;
+}
 
-    res.status(201).json({ id: newUser.id });
-  } catch (error) {
-    console.error(error);
-    res
-      .status(error.status || 500)
-      .json({ message: error.message || "Creation error" });
-  }
-});
+export function useChipsOverflow({
+  items,
+  emptyChipWidth,
+  avgCharSize,
+  gapWidth,
+  overflowChipWidth,
+  lines = 1,
+  removedChipWidth = 0,
+}: UseChipsOverflowOptions) {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const rowRef = useRef<HTMLDivElement>(null);
 
-router.post("/verify", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const user = await User.findOne({ where: { username } });
-    if (!user) return res.status(403).json({ message: "username not found" });
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
-    if (!passwordMatch)
-      return res.status(403).json({ message: "incorrect password" });
-    verifiedUsers[username] = true;
-    res.status(200).json({ message: "login successfuly" });
-  } catch (error) {
-    res
-      .status(error.status || 500)
-      .json({ message: error.message || "login error" });
-  }
-});
+  useEffect(() => {
+    const calculateVisibleChips = () => {
+      if (!rowRef.current || !items || items.length === 0) {
+        setVisibleCount(0);
+        return;
+      }
 
-router.post("/decode_message", (req, res) => {
-  try {
-    const { username, message } = req.body;
-    if (!verifiedUsers[username]) {
-      return res
-        .status(403)
-        .json({ error: "Access denied. User not verified." });
-    }
-    let isAscending = true;
-    for (let i = 0; i < message.length - 1; i++) {
-      if (message[i] > message[i + 1]) {
-        isAscending = false;
+      const rowWidth = rowRef.current.offsetWidth;
+
+      if (!rowWidth) {
+        setVisibleCount(0);
+        return;
+      }
+
+      let currentLine = 1;
+      let currentLineWidth = 0;
+      let count = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const chipWidth =
+          emptyChipWidth +
+          item.value.length * avgCharSize +
+          removedChipWidth;
+
+        const hiddenAfterThis = items.length - (count + 1);
+        const shouldReserveOverflow = hiddenAfterThis > 0 && currentLine === lines;
+        const reservedOverflowWidth = shouldReserveOverflow ? overflowChipWidth : 0;
+
+        const gapBeforeChip = currentLineWidth === 0 ? 0 : gapWidth;
+        const nextWidth = currentLineWidth + gapBeforeChip + chipWidth + reservedOverflowWidth;
+
+        // נכנס באותה שורה
+        if (nextWidth <= rowWidth) {
+          currentLineWidth += gapBeforeChip + chipWidth;
+          count++;
+          continue;
+        }
+
+        // אפשר לעבור לשורה חדשה
+        if (currentLine < lines) {
+          currentLine++;
+          currentLineWidth = chipWidth;
+          count++;
+          continue;
+        }
+
+        // לא נכנס וגם אין עוד שורות
         break;
       }
-    }
-    if (!isAscending) return res.json({ result: -1 });
-    let sum = 0;
-    for (let i = 0; i < message.length; i++) {
-      sum += message[i];
-    }
-    res.json({ result: sum });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: error.message || "Error decoding message" });
-  }
-});
 
-export default router;
+      setVisibleCount(count);
+    };
+
+    const timeoutId = setTimeout(calculateVisibleChips, 0);
+    window.addEventListener('resize', calculateVisibleChips);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', calculateVisibleChips);
+    };
+  }, [
+    items,
+    emptyChipWidth,
+    avgCharSize,
+    gapWidth,
+    overflowChipWidth,
+    lines,
+    removedChipWidth,
+  ]);
+
+  return { visibleCount, rowRef };
+}
