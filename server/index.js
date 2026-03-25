@@ -1,120 +1,228 @@
+import Checkbox from 'components/checkbox';
+import RadioButton from 'components/radioButton';
 import { useEffect, useRef, useState } from 'react';
-import type { Option } from 'types/constants';
+import * as strings from './strings';
+import type { FormData } from './types';
+import { useUser } from 'contexts/useUser';
+import { useBoolean, useOnClickOutside } from 'usehooks-ts';
+import { useFloating, autoUpdate, offset, flip, size, FloatingPortal } from '@floating-ui/react';
+import ChipsOverflow from 'components/chipsOverflow';
+import { useMailGroupSuggestions } from 'api/hooks/useMailGroupSuggestions';
 
-interface UseChipsOverflowOptions {
-  items: Option[] | undefined;
-  emptyChipWidth: number;
-  avgCharSize: number;
-  gapWidth: number;
-  overflowChipWidth: number;
-  removedChipWidth?: number;
-  lines?: number;
+interface MidurFormFieldProps {
+  handleInputChange: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+  mailGroups: string[] | undefined;
+  midur: boolean;
+  error?: string;
+  extraMidur?: boolean;
+  isParentExtraMidur: boolean;
 }
 
-export function useChipsOverflow({
-  items,
-  emptyChipWidth,
-  avgCharSize,
-  gapWidth,
-  overflowChipWidth,
-  lines = 1,
-  removedChipWidth = 0,
-}: UseChipsOverflowOptions) {
-  const [visibleCount, setVisibleCount] = useState(0);
-  const rowRef = useRef<HTMLDivElement>(null);
+export const MidurFormField = ({
+  handleInputChange,
+  mailGroups,
+  midur,
+  extraMidur,
+  isParentExtraMidur,
+}: MidurFormFieldProps) => {
+  const { user } = useUser();
+  const username = user.adfsUser;
+
+  const [midurInput, setMidurInput] = useState('');
+  const [debouncedMidurInput, setDebouncedMidurInput] = useState('');
+
+  const {
+    value: isOpen,
+    setTrue: openDropdown,
+    setFalse: closeDropdown,
+  } = useBoolean(false);
+
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { refs, floatingStyles } = useFloating({
+    open: isOpen,
+    onOpenChange: open => {
+      if (!open) closeDropdown();
+    },
+    middleware: [
+      offset(10),
+      flip({
+        fallbackPlacements: ['top', 'bottom'],
+      }),
+      size({
+        apply({ elements }) {
+          Object.assign(elements.floating.style, {
+            width: '250px',
+          });
+        },
+      }),
+    ],
+    whileElementsMounted: autoUpdate,
+    placement: 'bottom-start',
+  });
+
+  useOnClickOutside(
+    {
+      current: dropdownRef.current || triggerRef.current,
+    } as React.RefObject<HTMLElement>,
+    event => {
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        closeDropdown();
+      }
+    }
+  );
 
   useEffect(() => {
-    const calculateVisibleChips = () => {
-      if (!rowRef.current || !items || items.length === 0) {
-        setVisibleCount(0);
-        return;
-      }
+    const timeout = setTimeout(() => {
+      setDebouncedMidurInput(midurInput.trim());
+    }, 250);
 
-      const containerWidth = rowRef.current.offsetWidth;
+    return () => clearTimeout(timeout);
+  }, [midurInput]);
 
-      if (!containerWidth) {
-        setVisibleCount(0);
-        return;
-      }
+  const {
+    data: suggestions = [],
+    isFetching,
+    error: suggestionsError,
+  } = useMailGroupSuggestions({
+    query: debouncedMidurInput,
+    username,
+  });
 
-      let currentLine = 1;
-      let currentLineWidth = 0;
-      let count = 0;
+  useEffect(() => {
+    if (debouncedMidurInput.length < 3) {
+      closeDropdown();
+      return;
+    }
 
-      for (let i = 0; i < items.length; i += 1) {
-        const item = items[i];
-        const textLength = item.value?.length ?? item.label?.length ?? 0;
+    if (suggestions.length > 0) {
+      openDropdown();
+    } else {
+      closeDropdown();
+    }
+  }, [debouncedMidurInput, suggestions.length, openDropdown, closeDropdown]);
 
-        const chipWidth =
-          emptyChipWidth +
-          textLength * avgCharSize +
-          removedChipWidth;
+  useEffect(() => {
+    if (suggestionsError) {
+      console.error('Failed to load mail group suggestions');
+    }
+  }, [suggestionsError]);
 
-        const extraGap = currentLineWidth === 0 ? 0 : gapWidth;
-        const neededWidth = currentLineWidth + extraGap + chipWidth;
+  const shouldShowDropdown =
+    isOpen && debouncedMidurInput.length >= 3 && suggestions.length > 0;
 
-        if (neededWidth <= containerWidth) {
-          currentLineWidth = neededWidth;
-          count += 1;
-          continue;
-        }
+  const handleSelectOption = (group: string) => {
+    if (!mailGroups?.includes(group)) {
+      handleInputChange('mailGroups', [...(mailGroups || []), group]);
+    }
 
-        currentLine += 1;
+    setMidurInput('');
+    setDebouncedMidurInput('');
+    closeDropdown();
+  };
 
-        if (currentLine > lines) {
-          break;
-        }
+  const handleMailGroupChipDelete = (group: string) => {
+    handleInputChange(
+      'mailGroups',
+      mailGroups?.filter(value => value !== group)
+    );
+  };
 
-        currentLineWidth = chipWidth;
-        count += 1;
-      }
+  return (
+    <div className="drawer-form-field">
+      <div className="drawer-form-label top-label">{strings.midurLabel}</div>
 
-      // אם יש overflow, נשאיר מקום ל +N
-      if (count < items.length) {
-        while (count > 0) {
-          const lastVisible = items[count - 1];
-          const textLength =
-            lastVisible.value?.length ?? lastVisible.label?.length ?? 0;
+      <div className="midur-section">
+        <div className="midur-guidelines">
+          <p className="midur-guidelines-text">{strings.midurGuidelines}</p>
+        </div>
 
-          const lastChipWidth =
-            emptyChipWidth +
-            textLength * avgCharSize +
-            removedChipWidth;
+        <Checkbox
+          checked={!!midur}
+          onChange={() => handleInputChange('midur', !midur)}
+          label={strings.midurHardeningLabel}
+          className="midur-hardening-toggle"
+          disabled={isParentExtraMidur}
+        />
 
-          const neededForOverflow =
-            currentLineWidth + gapWidth + overflowChipWidth;
+        {midur && (
+          <>
+            <p className="midur-hardening-note">{strings.midurHardeningDisclaimer}</p>
 
-          if (neededForOverflow <= containerWidth) {
-            break;
-          }
+            <div className="midur-type-row">
+              <span className="midur-type-label">{strings.midurTypeLabel}</span>
+              <RadioButton checked label={strings.midurTypeEntry} disabled />
+              <RadioButton
+                checked={!extraMidur}
+                onChange={() => handleInputChange('extraMidur', !extraMidur)}
+                label={strings.midurTypeAdvanced}
+                disabled={isParentExtraMidur}
+              />
+            </div>
 
-          currentLineWidth -= lastChipWidth;
-          if (count > 1) {
-            currentLineWidth -= gapWidth;
-          }
-          count -= 1;
-        }
-      }
+            <div className="midur-guidelines">
+              <p className="midur-guidelines-text">{strings.midurMessage}</p>
+            </div>
 
-      setVisibleCount(Math.max(0, count));
-    };
+            <div className="midur-chip-list">
+              {mailGroups && (
+                <ChipsOverflow
+                  items={mailGroups.map(g => ({ label: g, value: g }))}
+                  showImage={false}
+                  lines={3}
+                  onRemove={(item) => handleMailGroupChipDelete(item.label)}
+                  enableOverflowDropDown
+                />
+              )}
 
-    const timeoutId = setTimeout(calculateVisibleChips, 0);
-    window.addEventListener('resize', calculateVisibleChips);
+              <input
+                ref={(node) => {
+                  refs.setReference(node);
+                  triggerRef.current = node;
+                }}
+                className="midur-chip-input"
+                placeholder={!mailGroups?.length ? strings.mailGroupsPlaceholder : undefined}
+                value={midurInput}
+                onChange={(e) => setMidurInput(e.target.value)}
+              />
 
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', calculateVisibleChips);
-    };
-  }, [
-    items,
-    emptyChipWidth,
-    avgCharSize,
-    gapWidth,
-    overflowChipWidth,
-    lines,
-    removedChipWidth,
-  ]);
+              {shouldShowDropdown && (
+                <FloatingPortal>
+                  <div
+                    ref={(node) => {
+                      refs.setFloating(node);
+                      dropdownRef.current = node;
+                    }}
+                    style={floatingStyles}
+                    className="chips-input-dropdown"
+                  >
+                    {isFetching && (
+                      <div className="chips-input-option">טוען...</div>
+                    )}
 
-  return { visibleCount, rowRef };
-}
+                    {!isFetching &&
+                      suggestions.map((opt, i) => (
+                        <div
+                          key={`${opt}-${i}`}
+                          className="chips-input-option"
+                          onClick={() => handleSelectOption(opt)}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                  </div>
+                </FloatingPortal>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
