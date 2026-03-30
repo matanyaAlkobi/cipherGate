@@ -1,23 +1,49 @@
-import { DataTypes, Sequelize } from "sequelize";
-import 'dotenv/config'
-const sequelize2 = new Sequelize(process.env.SEQUELIZE_CONNECTION, {
-  dialect: "mysql",
-});
+import Checkbox from 'components/checkbox';
+import ChipsInput from 'components/chipsInput';
+import type { Option } from 'types/constants';
 
-const User = sequelize2.define(
-  "User",
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
-    username: { type: DataTypes.STRING, allowNull: false },
-    password_hash: { type: DataTypes.STRING, allowNull: false },
-  },
-  { tableName: "users" }
-);
+interface SettingsFieldWithChipsProps {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+  isAdmin: boolean;
+  highlightLabel: string;
+  highlightValues: Option[];
+  highlightOptions: Option[];
+  onHighlightChange: (values: Option[]) => void;
+  placeholder: string;
+}
 
-await sequelize2.sync({force:false});
+export default function SettingsFieldWithChips({
+  label,
+  checked,
+  onChange,
+  isAdmin,
+  highlightLabel,
+  highlightValues,
+  highlightOptions,
+  onHighlightChange,
+  placeholder,
+}: SettingsFieldWithChipsProps) {
+  return (
+    <div className="settings-field-group">
+      <Checkbox
+        checked={checked}
+        onChange={onChange}
+        label={label}
+        className="settings-checkbox-item"
+      />
 
-export default User;
+      {/* חשוב: לאפשר שינוי גם כשה-checkbox מסומן בלבד */}
+      {checked && isAdmin && (
+        <ChipsInput
+          label={highlightLabel}
+          selectedOptions={highlightValues}
+          availableOptions={highlightOptions}
+          onChange={onHighlightChange}
+          placeholder={placeholder}
+        />
+      )}
+    </div>
+  );
+}
