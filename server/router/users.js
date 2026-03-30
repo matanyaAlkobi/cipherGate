@@ -1,98 +1,125 @@
-import { useRef, useEffect, useState } from 'react';
-import type { Option } from 'types/constants';
+import clsx from 'clsx';
+import Checkbox from 'components/checkbox';
+import Switch from 'components/switch';
+import type { NodeDisplaySettings } from 'contexts/displaySettingsContext';
+import SettingsFieldWithChips from './settingsFieldWithChips';
+import * as strings from './strings';
+import {
+  meaningOptions,
+  ziraOptions,
+  type Option,
+} from 'types/constants';
 
-interface UseChipsOverflowOptions {
-  items: Option[] | undefined;
-  emptyChipWidth: number;
-  avgCharSize: number;
-  gapWidth: number;
-  overflowChipWidth: number;
-  removedChipWidth?: number;
-  lines?: number;
+interface SettingsMenuDropdownProps {
+  tempSettings: NodeDisplaySettings;
+  isAdmin: boolean;
+  isGardner: boolean;
+  onCheckboxChange: (key: keyof NodeDisplaySettings) => void;
+  onHighlightChange: (
+    type: 'zira' | 'meaning' | 'systems',
+    values: Option[],
+  ) => void;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function useChipsOverflow({
-  items,
-  emptyChipWidth,
-  avgCharSize,
-  gapWidth,
-  overflowChipWidth,
-  lines = 1,
-  removedChipWidth = 0,
-}: UseChipsOverflowOptions) {
-  const [visibleCount, setVisibleCount] = useState(0);
-  const rowRef = useRef<HTMLDivElement>(null);
+export default function SettingsMenuDropdown({
+  tempSettings,
+  isAdmin,
+  isGardner,
+  onCheckboxChange,
+  onHighlightChange,
+  dropdownRef,
+}: SettingsMenuDropdownProps) {
+  return (
+    <div
+      className={clsx('settings-menu-dropdown', { admin: isAdmin })}
+      ref={dropdownRef}
+    >
+      <div className="settings-menu-content">
+        <Checkbox
+          checked={tempSettings.showArchived}
+          onChange={() => onCheckboxChange('showArchived')}
+          label={strings.showArchivedLabel}
+          className="settings-checkbox-item"
+        />
 
-  useEffect(() => {
-    const calculateVisibleChips = () => {
-      if (!rowRef.current || !items || items.length === 0) {
-        setVisibleCount(0);
-        return;
-      }
+        <div className="settings-separator" />
 
-      const rowWidth = rowRef.current.offsetWidth;
+        <Checkbox
+          checked={tempSettings.showDescription}
+          onChange={() => onCheckboxChange('showDescription')}
+          label={strings.descriptionLabel}
+          className="settings-checkbox-item"
+        />
 
-      if (!rowWidth) {
-        setVisibleCount(0);
-        return;
-      }
+        <div className="settings-field-group">
+          <Checkbox
+            checked={tempSettings.showIfdur}
+            onChange={() => onCheckboxChange('showIfdur')}
+            label={strings.ifdurLabel}
+            className="settings-checkbox-item"
+          />
 
-      let currentLine = 1;
-      let currentLineWidth = 0;
-      let count = 0;
+          {isAdmin && (
+            <div className="settings-switch-row settings-checkbox-indented">
+              <span className="settings-switch-label">
+                {strings.highlightIfdurHardeningLabel}
+              </span>
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const chipWidth =
-          emptyChipWidth +
-          item.value.length * avgCharSize +
-          removedChipWidth;
+              <Switch
+                checked={tempSettings.highlightIfdurHardening}
+                onChange={() => onCheckboxChange('highlightIfdurHardening')}
+              />
+            </div>
+          )}
+        </div>
 
-        const hiddenAfterThis = items.length - (count + 1);
-        const shouldReserveOverflow = hiddenAfterThis > 0 && currentLine === lines;
-        const reservedOverflowWidth = shouldReserveOverflow ? overflowChipWidth : 0;
+        <SettingsFieldWithChips
+          label={strings.ziraLabel}
+          checked={tempSettings.showZira}
+          onChange={() => onCheckboxChange('showZira')}
+          isAdmin={isAdmin || isGardner}
+          highlightLabel={strings.highlightLabel}
+          highlightValues={tempSettings.highlights?.zira || []}
+          highlightOptions={ziraOptions}
+          onHighlightChange={(values: Option[]) =>
+            onHighlightChange('zira', values)
+          }
+          placeholder={strings.selectZiraPlaceholder}
+        />
 
-        const gapBeforeChip = currentLineWidth === 0 ? 0 : gapWidth;
-        const nextWidth = currentLineWidth + gapBeforeChip + chipWidth + reservedOverflowWidth;
+        {isAdmin || isGardner ? (
+          <>
+            <SettingsFieldWithChips
+              label={strings.meaningLabel}
+              checked={tempSettings.showMeaning}
+              onChange={() => onCheckboxChange('showMeaning')}
+              isAdmin={isAdmin}
+              highlightLabel={strings.highlightLabel}
+              highlightValues={tempSettings.highlights?.meaning || []}
+              highlightOptions={meaningOptions}
+              onHighlightChange={(values: Option[]) =>
+                onHighlightChange('meaning', values)
+              }
+              placeholder={strings.selectMeaningPlaceholder}
+            />
 
-        // נכנס באותה שורה
-        if (nextWidth <= rowWidth) {
-          currentLineWidth += gapBeforeChip + chipWidth;
-          count++;
-          continue;
-        }
-
-        // אפשר לעבור לשורה חדשה
-        if (currentLine < lines) {
-          currentLine++;
-          currentLineWidth = chipWidth;
-          count++;
-          continue;
-        }
-
-        // לא נכנס וגם אין עוד שורות
-        break;
-      }
-
-      setVisibleCount(count);
-    };
-
-    const timeoutId = setTimeout(calculateVisibleChips, 0);
-    window.addEventListener('resize', calculateVisibleChips);
-
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', calculateVisibleChips);
-    };
-  }, [
-    items,
-    emptyChipWidth,
-    avgCharSize,
-    gapWidth,
-    overflowChipWidth,
-    lines,
-    removedChipWidth,
-  ]);
-
-  return { visibleCount, rowRef };
+            <SettingsFieldWithChips
+              label={strings.systemsLabel}
+              checked={tempSettings.showSystems}
+              onChange={() => onCheckboxChange('showSystems')}
+              isAdmin={isAdmin}
+              highlightLabel={strings.highlightLabel}
+              highlightValues={tempSettings.highlights?.systems || []}
+              highlightOptions={tempSettings.systemOptions || []}
+              onHighlightChange={(values: Option[]) =>
+                onHighlightChange('systems', values)
+              }
+              placeholder={strings.selectSystemsPlaceholder}
+            />
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
 }
