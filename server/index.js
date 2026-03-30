@@ -1,228 +1,118 @@
-import Checkbox from 'components/checkbox';
-import RadioButton from 'components/radioButton';
-import { useEffect, useRef, useState } from 'react';
-import * as strings from './strings';
-import type { FormData } from './types';
-import { useUser } from 'contexts/useUser';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useBoolean, useOnClickOutside } from 'usehooks-ts';
-import { useFloating, autoUpdate, offset, flip, size, FloatingPortal } from '@floating-ui/react';
-import ChipsOverflow from 'components/chipsOverflow';
-import { useMailGroupSuggestions } from 'api/hooks/useMailGroupSuggestions';
+import { useDisplaySettings } from 'contexts/useDisplaySettings';
+import { useUser } from 'contexts/useUser';
+import SettingsMenuDropdown from './settingsMenuDropdown';
+import * as strings from './strings';
+import './styles.scss';
+import Chevron from 'components/chevron';
+import type { Option } from 'types/constants';
 
-interface MidurFormFieldProps {
-  handleInputChange: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
-  mailGroups: string[] | undefined;
-  midur: boolean;
-  error?: string;
-  extraMidur?: boolean;
-  isParentExtraMidur: boolean;
-}
-
-export const MidurFormField = ({
-  handleInputChange,
-  mailGroups,
-  midur,
-  extraMidur,
-  isParentExtraMidur,
-}: MidurFormFieldProps) => {
+export default function SettingsButton() {
   const { user } = useUser();
-  const username = user.adfsUser;
+  const { displaySettings, updateDisplaySettings } = useDisplaySettings();
+  const { value: isOpen, toggle: toggleMenu } = useBoolean(false);
 
-  const [midurInput, setMidurInput] = useState('');
-  const [debouncedMidurInput, setDebouncedMidurInput] = useState('');
-
-  const {
-    value: isOpen,
-    setTrue: openDropdown,
-    setFalse: closeDropdown,
-  } = useBoolean(false);
-
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { refs, floatingStyles } = useFloating({
-    open: isOpen,
-    onOpenChange: open => {
-      if (!open) closeDropdown();
+  const [tempSettings, setTempSettings] = useState(displaySettings);
+
+  const hasActiveSettings =
+    Object.values(displaySettings).some(value =>
+      typeof value === 'boolean' ? value : Array.isArray(value) && value.length,
+    ) || Object.values(displaySettings.highlights).some(arr => arr && arr.length);
+
+  useEffect(() => {
+    setTempSettings(displaySettings);
+  }, [displaySettings]);
+
+  const handleMenuClick = useCallback(() => {
+    toggleMenu();
+  }, [toggleMenu]);
+
+  const handleCheckboxChange = useCallback(
+    (key: keyof typeof tempSettings) => {
+      setTempSettings(prev => {
+        const newSettings = {
+          ...prev,
+          [key]: !prev[key],
+        };
+
+        updateDisplaySettings(newSettings);
+        return newSettings;
+      });
     },
-    middleware: [
-      offset(10),
-      flip({
-        fallbackPlacements: ['top', 'bottom'],
-      }),
-      size({
-        apply({ elements }) {
-          Object.assign(elements.floating.style, {
-            width: '250px',
-          });
-        },
-      }),
-    ],
-    whileElementsMounted: autoUpdate,
-    placement: 'bottom-start',
-  });
+    [updateDisplaySettings],
+  );
+
+  const handleHighlightChange = useCallback(
+    (type: 'zira' | 'meaning' | 'systems', values: Option[]) => {
+      setTempSettings(prev => {
+        const newSettings = {
+          ...prev,
+          highlights: {
+            ...prev.highlights,
+            [type]: values,
+          },
+        };
+
+        updateDisplaySettings(newSettings);
+        return newSettings;
+      });
+    },
+    [updateDisplaySettings],
+  );
 
   useOnClickOutside(
-    {
-      current: dropdownRef.current || triggerRef.current,
-    } as React.RefObject<HTMLElement>,
+    [dropdownRef, buttonRef] as React.RefObject<HTMLElement>[],
     event => {
       if (
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node) &&
         dropdownRef.current &&
+        buttonRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        closeDropdown();
+        toggleMenu();
       }
-    }
+    },
   );
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebouncedMidurInput(midurInput.trim());
-    }, 250);
-
-    return () => clearTimeout(timeout);
-  }, [midurInput]);
-
-  const {
-    data: suggestions = [],
-    isFetching,
-    error: suggestionsError,
-  } = useMailGroupSuggestions({
-    query: debouncedMidurInput,
-    username,
-  });
-
-  useEffect(() => {
-    if (debouncedMidurInput.length < 3) {
-      closeDropdown();
-      return;
-    }
-
-    if (suggestions.length > 0) {
-      openDropdown();
-    } else {
-      closeDropdown();
-    }
-  }, [debouncedMidurInput, suggestions.length, openDropdown, closeDropdown]);
-
-  useEffect(() => {
-    if (suggestionsError) {
-      console.error('Failed to load mail group suggestions');
-    }
-  }, [suggestionsError]);
-
-  const shouldShowDropdown =
-    isOpen && debouncedMidurInput.length >= 3 && suggestions.length > 0;
-
-  const handleSelectOption = (group: string) => {
-    if (!mailGroups?.includes(group)) {
-      handleInputChange('mailGroups', [...(mailGroups || []), group]);
-    }
-
-    setMidurInput('');
-    setDebouncedMidurInput('');
-    closeDropdown();
-  };
-
-  const handleMailGroupChipDelete = (group: string) => {
-    handleInputChange(
-      'mailGroups',
-      mailGroups?.filter(value => value !== group)
-    );
-  };
 
   return (
-    <div className="drawer-form-field">
-      <div className="drawer-form-label top-label">{strings.midurLabel}</div>
+    <div className="settings-button-container">
+      <button
+        ref={buttonRef}
+        className="settings-button"
+        onClick={handleMenuClick}
+        title={strings.settingsMenuTitle}
+      >
+        {hasActiveSettings && <span className="settings-button-indicator" />}
 
-      <div className="midur-section">
-        <div className="midur-guidelines">
-          <p className="midur-guidelines-text">{strings.midurGuidelines}</p>
-        </div>
+        <svg width="14.94" height="12.15" viewBox="0 0 14.94 12.15">
+          <path
+            fill="currentColor"
+            d="M8.86,12.15H6.07c-.76,0-1.5-.5-1.58-.8.84,0,.68,0,1.93,1.1,6.07,0H8.86C11.62,0,13,0,14.15,1.2,35,1.5,11,0,4.15-1.5,11-2.34,1-5.11,186,68.1C-2.49,0,3.73,0,4.43,0Z"
+          />
+          <path
+            fill="currentColor"
+            d="M8.88,2.31h2.56a.8.8,0,0,1,.8.8v4.63a.8.8,0,0,1-.8.8H8.88a.8.8,0,0,1-.8-.8V3.11A.8.8,0,0,1,8.88,2.31ZM6.14.5,5.5,0,0,1,.5,5v.5a.5.5,0,0,1-.5.5H3a.5.5,0,0,1-.5-.5v-.5a.5.5,0,0,1,.5-.5H3.64A.5.5,0,0,0,4.14,4V1A.5.5,0,0,0,3.64.5Z"
+          />
+        </svg>
 
-        <Checkbox
-          checked={!!midur}
-          onChange={() => handleInputChange('midur', !midur)}
-          label={strings.midurHardeningLabel}
-          className="midur-hardening-toggle"
-          disabled={isParentExtraMidur}
+        <span className="settings-button-text">{strings.displaySettingsTitle}</span>
+
+        <Chevron isOpen={isOpen} alwaysDown />
+      </button>
+
+      {isOpen && (
+        <SettingsMenuDropdown
+          dropdownRef={dropdownRef}
+          tempSettings={tempSettings}
+          isAdmin={user?.isAdmin || false}
+          isGardner={user?.isGardner || false}
+          onCheckboxChange={handleCheckboxChange}
+          onHighlightChange={handleHighlightChange}
         />
-
-        {midur && (
-          <>
-            <p className="midur-hardening-note">{strings.midurHardeningDisclaimer}</p>
-
-            <div className="midur-type-row">
-              <span className="midur-type-label">{strings.midurTypeLabel}</span>
-              <RadioButton checked label={strings.midurTypeEntry} disabled />
-              <RadioButton
-                checked={!extraMidur}
-                onChange={() => handleInputChange('extraMidur', !extraMidur)}
-                label={strings.midurTypeAdvanced}
-                disabled={isParentExtraMidur}
-              />
-            </div>
-
-            <div className="midur-guidelines">
-              <p className="midur-guidelines-text">{strings.midurMessage}</p>
-            </div>
-
-            <div className="midur-chip-list">
-              {mailGroups && (
-                <ChipsOverflow
-                  items={mailGroups.map(g => ({ label: g, value: g }))}
-                  showImage={false}
-                  lines={3}
-                  onRemove={(item) => handleMailGroupChipDelete(item.label)}
-                  enableOverflowDropDown
-                />
-              )}
-
-              <input
-                ref={(node) => {
-                  refs.setReference(node);
-                  triggerRef.current = node;
-                }}
-                className="midur-chip-input"
-                placeholder={!mailGroups?.length ? strings.mailGroupsPlaceholder : undefined}
-                value={midurInput}
-                onChange={(e) => setMidurInput(e.target.value)}
-              />
-
-              {shouldShowDropdown && (
-                <FloatingPortal>
-                  <div
-                    ref={(node) => {
-                      refs.setFloating(node);
-                      dropdownRef.current = node;
-                    }}
-                    style={floatingStyles}
-                    className="chips-input-dropdown"
-                  >
-                    {isFetching && (
-                      <div className="chips-input-option">טוען...</div>
-                    )}
-
-                    {!isFetching &&
-                      suggestions.map((opt, i) => (
-                        <div
-                          key={`${opt}-${i}`}
-                          className="chips-input-option"
-                          onClick={() => handleSelectOption(opt)}
-                        >
-                          {opt}
-                        </div>
-                      ))}
-                  </div>
-                </FloatingPortal>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
-};
+}
