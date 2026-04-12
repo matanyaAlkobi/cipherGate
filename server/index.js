@@ -1,118 +1,149 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
-import { useBoolean, useOnClickOutside } from 'usehooks-ts';
-import { useDisplaySettings } from 'contexts/useDisplaySettings';
-import { useUser } from 'contexts/useUser';
-import SettingsMenuDropdown from './settingsMenuDropdown';
-import * as strings from './strings';
-import './styles.scss';
-import Chevron from 'components/chevron';
-import type { Option } from 'types/constants';
+const setNodesAndEdges = (
+  data: FamilyTreeData<FamilyNodeRawData>
+): FamilyTreeGraphData => {
+  const {
+    entity,
+    parent,
+    grandParent,
+    siblings,
+    children,
+    minimizedSiblings,
+    minimizedChildren,
+  } = data;
 
-export default function SettingsButton() {
-  const { user } = useUser();
-  const { displaySettings, updateDisplaySettings } = useDisplaySettings();
-  const { value: isOpen, toggle: toggleMenu } = useBoolean(false);
+  const graphNodes: Node<FamilyNodeData>[] = [
+    {
+      id: entity.id,
+      position: { x: 0, y: 0 },
+      data: setRawDataToData(entity),
+      type: 'familyNode',
+    },
+    ...siblings.map((item) => ({
+      id: item.id,
+      position: { x: 0, y: 0 },
+      data: setRawDataToData(item),
+      type: 'familyNode',
+    })),
+    ...children.map((item) => ({
+      id: item.id,
+      position: { x: 0, y: 0 },
+      data: setRawDataToData(item),
+      type: 'familyNode',
+    })),
+  ];
 
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  if (parent) {
+    graphNodes.push({
+      id: parent.id,
+      position: { x: 0, y: 0 },
+      data: setRawDataToData(parent),
+      type: 'familyNode',
+    });
+  }
 
-  const [tempSettings, setTempSettings] = useState(displaySettings);
+  if (grandParent) {
+    graphNodes.push({
+      id: grandParent.id,
+      position: { x: 0, y: 0 },
+      data: setRawDataToData(grandParent),
+      type: 'familyNode',
+    });
+  }
 
-  const hasActiveSettings =
-    Object.values(displaySettings).some(value =>
-      typeof value === 'boolean' ? value : Array.isArray(value) && value.length,
-    ) || Object.values(displaySettings.highlights).some(arr => arr && arr.length);
+  if (minimizedSiblings.length) {
+    graphNodes.push({
+      id: `more-siblings-${entity.id}`,
+      position: { x: 0, y: 0 },
+      data: {
+        name: strings.moreSiblings(minimizedSiblings.length),
+        id: `more-siblings-${entity.id}`,
+        type: 'more',
+        siblings: minimizedSiblings,
+      },
+      type: 'familyNode',
+    });
+  }
 
-  useEffect(() => {
-    setTempSettings(displaySettings);
-  }, [displaySettings]);
+  if (minimizedChildren.length) {
+    graphNodes.push({
+      id: `more-children-${entity.id}`,
+      position: { x: 0, y: 0 },
+      data: {
+        name: strings.moreChildren(minimizedChildren.length),
+        id: `more-children-${entity.id}`,
+        type: 'more',
+        children: minimizedChildren,
+      },
+      type: 'familyNode',
+    });
+  }
 
-  const handleMenuClick = useCallback(() => {
-    toggleMenu();
-  }, [toggleMenu]);
+  const filteredNodes = showArchived
+    ? graphNodes
+    : graphNodes.filter((node) => !node.data.archived);
 
-  const handleCheckboxChange = useCallback(
-    (key: keyof typeof tempSettings) => {
-      setTempSettings(prev => {
-        const newSettings = {
-          ...prev,
-          [key]: !prev[key],
-        };
+  const nodeIds = new Set(filteredNodes.map((node) => node.id));
+  const edges: Edge[] = [];
 
-        updateDisplaySettings(newSettings);
-        return newSettings;
+  // רק אם יש parent – מוסיפים את החלק העליון
+  if (parent) {
+    if (grandParent) {
+      edges.push({
+        id: `e-${grandParent.id}-${parent.id}`,
+        source: grandParent.id,
+        target: parent.id,
+        type: 'step',
       });
-    },
-    [updateDisplaySettings],
-  );
+    }
 
-  const handleHighlightChange = useCallback(
-    (type: 'zira' | 'meaning' | 'systems', values: Option[]) => {
-      setTempSettings(prev => {
-        const newSettings = {
-          ...prev,
-          highlights: {
-            ...prev.highlights,
-            [type]: values,
-          },
-        };
-
-        updateDisplaySettings(newSettings);
-        return newSettings;
+    if (minimizedSiblings.length) {
+      edges.push({
+        id: `e-${parent.id}-more-siblings-${entity.id}`,
+        source: parent.id,
+        target: `more-siblings-${entity.id}`,
+        type: 'step',
       });
-    },
-    [updateDisplaySettings],
+    }
+
+    const firstHalf = siblings.slice(0, siblings.length / 2);
+    const secondHalf = siblings.slice(siblings.length / 2);
+    const parentChildren = [...firstHalf, entity, ...secondHalf];
+
+    parentChildren.forEach((child) => {
+      edges.push({
+        id: `e-${parent.id}-${child.id}`,
+        source: parent.id,
+        target: child.id,
+        type: 'step',
+      });
+    });
+  }
+
+  // גם בלי parent – עדיין entity -> children חייבים להיבנות
+  if (minimizedChildren.length) {
+    edges.push({
+      id: `e-${entity.id}-more-children-${entity.id}`,
+      source: entity.id,
+      target: `more-children-${entity.id}`,
+      type: 'step',
+    });
+  }
+
+  children.forEach((child) => {
+    edges.push({
+      id: `e-${entity.id}-${child.id}`,
+      source: entity.id,
+      target: child.id,
+      type: 'step',
+    });
+  });
+
+  const filteredEdges = edges.filter(
+    (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
   );
 
-  useOnClickOutside(
-    [dropdownRef, buttonRef] as React.RefObject<HTMLElement>[],
-    event => {
-      if (
-        dropdownRef.current &&
-        buttonRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        toggleMenu();
-      }
-    },
-  );
-
-  return (
-    <div className="settings-button-container">
-      <button
-        ref={buttonRef}
-        className="settings-button"
-        onClick={handleMenuClick}
-        title={strings.settingsMenuTitle}
-      >
-        {hasActiveSettings && <span className="settings-button-indicator" />}
-
-        <svg width="14.94" height="12.15" viewBox="0 0 14.94 12.15">
-          <path
-            fill="currentColor"
-            d="M8.86,12.15H6.07c-.76,0-1.5-.5-1.58-.8.84,0,.68,0,1.93,1.1,6.07,0H8.86C11.62,0,13,0,14.15,1.2,35,1.5,11,0,4.15-1.5,11-2.34,1-5.11,186,68.1C-2.49,0,3.73,0,4.43,0Z"
-          />
-          <path
-            fill="currentColor"
-            d="M8.88,2.31h2.56a.8.8,0,0,1,.8.8v4.63a.8.8,0,0,1-.8.8H8.88a.8.8,0,0,1-.8-.8V3.11A.8.8,0,0,1,8.88,2.31ZM6.14.5,5.5,0,0,1,.5,5v.5a.5.5,0,0,1-.5.5H3a.5.5,0,0,1-.5-.5v-.5a.5.5,0,0,1,.5-.5H3.64A.5.5,0,0,0,4.14,4V1A.5.5,0,0,0,3.64.5Z"
-          />
-        </svg>
-
-        <span className="settings-button-text">{strings.displaySettingsTitle}</span>
-
-        <Chevron isOpen={isOpen} alwaysDown />
-      </button>
-
-      {isOpen && (
-        <SettingsMenuDropdown
-          dropdownRef={dropdownRef}
-          tempSettings={tempSettings}
-          isAdmin={user?.isAdmin || false}
-          isGardner={user?.isGardner || false}
-          onCheckboxChange={handleCheckboxChange}
-          onHighlightChange={handleHighlightChange}
-        />
-      )}
-    </div>
-  );
-}
+  return {
+    nodes: filteredNodes,
+    edges: filteredEdges,
+  };
+};
