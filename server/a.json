@@ -1,0 +1,16 @@
+PUT _ilm/policy/teamber-api-logs-14d
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {}
+      },
+      "delete": {
+        "min_age": "14d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
