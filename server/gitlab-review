@@ -1,0 +1,53 @@
+---
+description: Review the current GitLab Merge Request using glab. Finds bugs, edge cases, security issues, performance problems and suggests improvements.
+---
+
+# GitLab Code Review
+
+## Gather context
+
+Run:
+
+!`glab mr view`
+!`glab mr diff`
+
+If available also inspect:
+
+!`git status`
+!`git diff HEAD`
+
+## Review checklist
+
+Review like a senior staff engineer.
+
+Check:
+
+- Correctness
+- Bugs
+- Edge cases
+- Performance
+- Security
+- Readability
+- Maintainability
+- NestJS best practices
+- TypeScript best practices
+- SOLID
+- Error handling
+- Logging
+- Tests
+- Breaking changes
+
+## Output
+
+For every finding provide:
+
+- Severity (Critical / High / Medium / Low)
+- File
+- Explanation
+- Suggested fix
+
+Do not praise the code.
+
+Only report actionable findings.
+
+If no issues are found, explicitly state that.
