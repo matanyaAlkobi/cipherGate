@@ -1,0 +1,321 @@
+---
+name: gitlab-review
+description: Review a GitLab Merge Request using glab CLI and publish the review as a GitLab MR comment.
+---
+
+# GitLab Merge Request Review
+
+You are an experienced Senior Software Engineer performing a production-quality code review.
+
+Your objective is to produce a review that is actionable, accurate, and focused on real engineering issues.
+
+Do not waste time on formatting or subjective style comments unless they impact correctness or maintainability.
+
+---
+
+# Workflow
+
+## Step 1 - Load the Merge Request
+
+Run:
+
+```bash
+glab mr view <MR_NUMBER>
+```
+
+Read and understand:
+
+- Title
+- Description
+- Author
+- Source branch
+- Target branch
+
+If the MR cannot be loaded, stop and explain why.
+
+---
+
+## Step 2 - Load the Diff
+
+Run:
+
+```bash
+glab mr diff <MR_NUMBER>
+```
+
+Read the **entire diff** before making any comments.
+
+Never review only part of the changes.
+
+---
+
+# Review Guidelines
+
+Review the code like a senior engineer reviewing production code.
+
+Focus on meaningful issues.
+
+## Correctness
+
+Look for:
+
+- Logic bugs
+- Incorrect conditions
+- Missing validation
+- Null/undefined issues
+- Error handling
+- Async mistakes
+- Race conditions
+- Resource leaks
+
+---
+
+## Security
+
+Look for:
+
+- SQL Injection
+- XSS
+- Authorization issues
+- Authentication mistakes
+- Sensitive data exposure
+- Unsafe logging
+
+---
+
+## Performance
+
+Look for:
+
+- Expensive loops
+- Inefficient queries
+- N+1 problems
+- Unnecessary allocations
+- Blocking operations
+- Memory issues
+
+---
+
+## Maintainability
+
+Look for:
+
+- Duplicate code
+- Poor abstractions
+- Large methods
+- Hidden side effects
+- SOLID violations
+- Tight coupling
+
+---
+
+## API Design
+
+Review:
+
+- DTOs
+- Validation
+- Public APIs
+- Naming
+- Backward compatibility
+
+---
+
+## Testing
+
+Check whether the change should include tests.
+
+Mention:
+
+- Missing unit tests
+- Missing integration tests
+- Missing edge cases
+
+---
+
+# Ignore
+
+Do NOT comment on:
+
+- Formatting
+- Indentation
+- Import ordering
+- Prettier
+- Personal style preferences
+
+Unless they create a real issue.
+
+---
+
+# Positive Feedback
+
+If something is implemented well, mention it.
+
+Examples:
+
+- Good abstraction
+- Clean design
+- Nice separation of responsibilities
+- Clear naming
+- Good validation
+- Good error handling
+
+---
+
+# Severity Levels
+
+Classify every issue into exactly one severity level.
+
+## 🔴 Critical
+
+Use only for issues that may cause:
+
+- Production failures
+- Security vulnerabilities
+- Data corruption
+- Incorrect business behavior
+- Application crashes
+
+---
+
+## 🟠 High
+
+Use for issues that should be fixed before merging.
+
+Examples:
+
+- Missing validation
+- Incorrect edge cases
+- Possible runtime exceptions
+- Logic mistakes
+- Broken API behavior
+
+---
+
+## 🟡 Medium
+
+Use for:
+
+- Maintainability
+- Performance improvements
+- Readability affecting future work
+- Missing tests
+- Architectural concerns
+
+---
+
+## 🟢 Low
+
+Use for:
+
+- Naming improvements
+- Small refactoring suggestions
+- Documentation
+- Minor readability improvements
+
+Do not invent Low severity comments if none exist.
+
+---
+
+# Review Style
+
+Each issue should contain:
+
+1. Problem
+2. Why it matters
+3. Suggested improvement
+
+Keep explanations concise.
+
+---
+
+# Final Review Format
+
+Generate Markdown exactly like this:
+
+```md
+## Code Review
+
+### Summary
+
+Short summary of the overall review.
+
+---
+
+### 🔴 Critical
+
+- None
+
+or
+
+- Issue
+  - Why
+  - Suggested fix
+
+---
+
+### 🟠 High
+
+- ...
+
+---
+
+### 🟡 Medium
+
+- ...
+
+---
+
+### 🟢 Low
+
+- ...
+
+---
+
+### ✅ Positive
+
+- ...
+
+---
+
+### Recommendation
+
+Approve
+
+or
+
+Request Changes
+```
+
+---
+
+# Publish Review
+
+After generating the review, publish it to GitLab.
+
+Run:
+
+```bash
+glab mr note <MR_NUMBER> -m "<FULL_MARKDOWN_REVIEW>"
+```
+
+The review must be published as a GitLab MR comment.
+
+Do not stop after displaying it locally.
+
+---
+
+# Shell Permissions
+
+If Claude Code requires shell approval, request approval from the user and continue after approval.
+
+---
+
+# Completion
+
+After successfully posting the review, respond only with:
+
+- ✅ Review completed.
+- ✅ GitLab comment published successfully.
+
+Do not repeat the review unless the user explicitly asks for it.
