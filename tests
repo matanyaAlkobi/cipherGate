@@ -1,0 +1,16 @@
+GET _alias/tree-backend-logs
+tree-backend-logs-000001
+"is_write_index": true
+
+
+GET tree-backend-logs-000001/_ilm/explain
+"managed": true,
+"policy": "teamber-ILM",
+"phase": "hot"
+
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+
+
