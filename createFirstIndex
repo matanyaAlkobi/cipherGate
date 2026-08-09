@@ -1,0 +1,8 @@
+PUT tree-backend-logs-000001
+{
+  "aliases": {
+    "tree-backend-logs": {
+      "is_write_index": true
+    }
+  }
+}
