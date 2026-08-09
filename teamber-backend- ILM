@@ -19,3 +19,7 @@ PUT _ilm/policy/teamber-ILM
     }
   }
 }
+
+
+
+GET _ilm/policy/teamber-ILM
