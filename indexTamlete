@@ -1,0 +1,10 @@
+PUT _index_template/tree-backend-logs-template
+{
+  "index_patterns": ["tree-backend-logs-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "teamber-ILM",
+      "index.lifecycle.rollover_alias": "tree-backend-logs"
+    }
+  }
+}
