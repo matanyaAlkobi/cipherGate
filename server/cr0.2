@@ -1,0 +1,119 @@
+name: local-cr description: Review local changes against dev and report only real, actionable issues.
+
+Local CR
+
+Review the current branch against dev.
+
+Scope
+
+Use:
+
+```bash
+git status --short
+git branch --show-current
+git diff origin/dev...HEAD
+git diff HEAD
+```
+
+If origin/dev does not exist, use:
+
+```bash
+git diff dev...HEAD
+```
+
+Review:
+
+• committed changes in the current branch vs dev
+• uncommitted local changes
+
+Do not review unrelated legacy code.
+
+What to check
+
+Focus only on real issues:
+
+• Bugs and regressions
+• Null/undefined/runtime errors
+• Missing await, bad async logic, race conditions
+• TypeScript type/runtime mismatches
+• NestJS DI, guards, DTO validation, API contracts
+• React hooks, state, stale data, React Query mistakes
+• SQL/ORM queries, transactions, N+1, schema mismatches
+• Security/auth/authorization/input validation
+• Meaningful performance problems
+• Significant duplicated logic introduced by the change
+• Edge cases and error handling
+• Breaking changes to existing behavior or contracts
+• SOLID/maintainability issues that materially increase bug risk
+• Missing or incorrect logging for important failures
+• Missing tests for important changed behavior
+
+Ignore:
+
+• formatting
+• naming preferences
+• minor refactors
+• harmless style issues
+• speculative findings
+
+Verification
+
+Before reporting a finding:
+
+1. Read enough surrounding code to verify it.
+2. Confirm the issue is caused by the current change.
+3. Confirm another layer does not already handle it.
+4. Report only if confidence is high.
+
+Prefer a few strong findings over many weak ones.
+
+Severity
+
+Use:
+
+• CRITICAL — security, data loss, outage, corruption
+• HIGH — likely production bug/regression
+• MEDIUM — real edge case or moderate issue
+• LOW — rare, only if clearly actionable
+
+Output
+
+For each finding:
+
+```text
+[HIGH] Short title
+File: path/to/file.ts:42
+
+Problem:
+What is wrong.
+
+Impact:
+What can actually happen.
+
+Fix:
+Smallest practical fix.
+```
+
+Finish with:
+
+```text
+Verdict: APPROVE
+```
+
+or:
+
+```text
+Verdict: CHANGES REQUESTED
+```
+
+Use CHANGES REQUESTED for any CRITICAL or HIGH issue.
+
+If there are no real issues:
+
+```text
+No blocking issues found.
+Verdict: APPROVE
+```
+
+Do not modify code unless explicitly asked.
+Do not commit, push, or post comments.
