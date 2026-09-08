@@ -1,0 +1,107 @@
+name: nest-local-cr description: Review local NestJS/TypeScript changes against dev and report only real, actionable issues.
+
+NestJS Local CR
+
+Review the current branch against dev.
+
+Scope
+
+Use:
+
+```bash
+git status --short
+git branch --show-current
+git diff origin/dev...HEAD
+git diff HEAD
+```
+
+If origin/dev does not exist:
+
+```bash
+git diff dev...HEAD
+```
+
+Review committed branch changes and uncommitted local changes.
+Do not review unrelated legacy code.
+
+Check
+
+Focus on real issues:
+
+• Bugs, regressions and edge cases
+• Null/undefined/runtime errors
+• Missing await, bad async logic and race conditions
+• TypeScript type/runtime mismatches
+• NestJS DI, modules, providers, guards, pipes and interceptors
+• DTO validation and API contracts
+• Authentication and authorization
+• Error handling and important failure logging
+• SQL/ORM queries, transactions, N+1 and schema mismatches
+• Security and input validation
+• Meaningful performance/scalability problems
+• Significant duplicated logic introduced by the change
+• Breaking changes to existing behavior or contracts
+• SOLID/maintainability issues that materially increase bug risk
+• Missing tests for important changed behavior
+• Violations of existing project conventions that can cause inconsistency or bugs
+• Likely future bugs or scalability issues introduced by the change
+
+Ignore formatting, naming preferences, harmless style issues and speculative findings.
+
+Verification
+
+Before reporting:
+
+1. Read enough surrounding code to verify it.
+2. Confirm the current change introduced or exposed it.
+3. Check that another layer does not already handle it.
+4. Report only high-confidence findings.
+
+Prefer a few strong findings over many weak ones.
+
+Severity
+
+• CRITICAL — security, data loss, outage, corruption
+• HIGH — likely production bug/regression
+• MEDIUM — real edge case or moderate issue
+• LOW — rare, clearly actionable only
+
+Output
+
+```text
+[HIGH] Short title
+File: path/to/file.ts:42
+
+Problem:
+What is wrong.
+
+Impact:
+What can actually happen.
+
+Fix:
+Smallest practical fix.
+```
+
+Finish with:
+
+```text
+Verdict: APPROVE
+```
+
+or:
+
+```text
+Verdict: CHANGES REQUESTED
+```
+
+Use CHANGES REQUESTED for any CRITICAL or HIGH issue.
+
+If no real issues:
+
+```text
+No blocking issues found.
+Verdict: APPROVE
+```
+
+Do not modify code unless explicitly asked.
+Do not commit, push, or post comments.
